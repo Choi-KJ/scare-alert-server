@@ -34,27 +34,35 @@ body{
   letter-spacing:0.01em;
 }
 
-/* ---------- film sprocket rail ---------- */
+/* ---------- 필름 퍼포레이션 레일 ---------- */
+/* 좌우에 필름 스트립(베이스 띠 + 둥근 사각 구멍)을 세로로 반복. SVG 타일로 진짜
+   필름 퍼포레이션 형태를 낸다. 구멍은 페이지 배경색(#0a0a12)으로 채워 컷아웃처럼,
+   베이스 띠는 보조 배경색(#181826, --bg-panel-2)으로 필름 느낌을 준다.
+   (SVG data URI는 CSS 변수를 못 써서 색을 직접 넣음) */
 .sprocket-rail{
   position:fixed;
   top:0; bottom:0;
-  width:22px;
-  background-image: radial-gradient(circle at 11px 16px, var(--bg-panel-2) 6px, transparent 6.5px);
-  background-size: 22px 34px;
-  background-repeat: repeat-y;
-  background-color: var(--bg);
+  width:28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='40'%3E%3Crect width='28' height='40' fill='%23181826'/%3E%3Crect x='7' y='9' width='14' height='22' rx='4.5' fill='%230a0a12'/%3E%3C/svg%3E");
+  background-size:28px 40px;
+  background-repeat:repeat-y;
   z-index:50;
-  opacity:0.9;
 }
-.sprocket-rail.left{ left:0; border-right:1px solid var(--line); }
-.sprocket-rail.right{ right:0; border-left:1px solid var(--line); }
-@media (max-width:720px){ .sprocket-rail{ width:12px; background-size:12px 22px; background-image: radial-gradient(circle at 6px 11px, var(--bg-panel-2) 3.5px, transparent 4px);} }
+.sprocket-rail.left{ left:0; box-shadow: inset -1px 0 0 var(--line); }
+.sprocket-rail.right{ right:0; box-shadow: inset 1px 0 0 var(--line); }
+@media (max-width:720px){
+  .sprocket-rail{
+    width:18px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='28'%3E%3Crect width='18' height='28' fill='%23181826'/%3E%3Crect x='4.5' y='6' width='9' height='16' rx='3' fill='%230a0a12'/%3E%3C/svg%3E");
+    background-size:18px 28px;
+  }
+}
 
 .page{
-  padding-left:22px;
-  padding-right:22px;
+  padding-left:28px;
+  padding-right:28px;
 }
-@media (max-width:720px){ .page{ padding-left:12px; padding-right:12px; } }
+@media (max-width:720px){ .page{ padding-left:18px; padding-right:18px; } }
 
 /* ---------- nav ---------- */
 nav{
@@ -316,7 +324,7 @@ footer p{ color:var(--muted); font-size:14px; margin-bottom:26px; }
 
 /* ---------- 첫 로드: 히어로 애니메이션 종료 후 나타나는 요소 ---------- */
 /* nav · 좌우 필름 레일 · eyebrow는 처음엔 숨겨졌다가 settle() 시점에 함께 페이드인.
-   .is-hidden 제거 시 각 요소의 본래 opacity(레일 0.9, 나머지 1)로 복귀한다. */
+   .is-hidden 제거 시 각 요소의 본래 opacity(1)로 복귀한다. */
 .js-reveal{ transition: opacity .6s ease; }
 .is-hidden{ opacity: 0; }
 
