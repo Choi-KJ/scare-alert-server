@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1785405145978,
+      "tag": "0000_windy_anthem",
+      "breakpoints": true
+    }
+  ]
+}
