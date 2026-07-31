@@ -23,6 +23,15 @@ submissionsRoute.post('/', async (c) => {
     return c.json({ error: 'invalid payload', details: parsed.error.flatten() }, 400)
   }
 
-  await createSubmission(parsed.data)
+  const result = await createSubmission(parsed.data)
+
+  if (result === 'rate_limited') {
+    c.header('Retry-After', '5')
+    return c.json({ error: 'too many requests' }, 429)
+  }
+  if (result === 'duplicate') {
+    // 멱등 처리 — 이미 접수된 제보라 에러 대신 정상 응답
+    return c.json({ ok: true, duplicate: true }, 200)
+  }
   return c.json({ ok: true }, 201)
 })
