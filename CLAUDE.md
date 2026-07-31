@@ -36,11 +36,15 @@ src/
     submissions.ts   # POST /api/submissions
     timestamps.ts    # GET  /api/timestamps
   services/       # 비즈니스 로직 (@Service 자리)
-    submissionService.ts
+    submissionService.ts   # 제보 저장 → 어뷰징 검사 → 재집계
+  lib/
+    aggregate.ts    # 집계/확정: ±N초 클러스터링 + 서로 다른 세션 M개 → 중앙값 확정 (N=2, M=2)
+    rateLimit.ts    # 어뷰징 방지: 세션 빈도 제한(5초, DB NOW 기준) + 중복 제거
 public/           # 정적 사이트 (index.html=랜딩, styles.css, *.svg)
 drizzle/          # drizzle-kit이 생성한 마이그레이션 SQL (커밋함)
 ```
-아직 없는 것(예정): `lib/aggregate.ts`(집계/확정), `lib/rateLimit.ts`(어뷰징 방지), 영화/관리자 페이지.
+**구현 완료(2026-07-31):** 제보 API·집계/확정·어뷰징 방지 실DB 검증 완료. 확장과 실환경 연동됨(제보 수신 + 확정 조회).
+아직 없는 것(예정): 영화 목록/상세·관리자 페이지, 집계 M 상향(3+), 단위 테스트.
 
 ## 명령어
 - `npm run dev` — 개발 서버(파일 변경 시 자동 재시작, http://localhost:3000)
