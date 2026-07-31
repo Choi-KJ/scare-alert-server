@@ -26,7 +26,11 @@ timestampsRoute.get('/', async (c) => {
   }
 
   const points = await db
-    .select({ at: confirmedTimestamps.atSeconds, confidence: confirmedTimestamps.confidence })
+    .select({
+      at: confirmedTimestamps.atSeconds,
+      confidence: confirmedTimestamps.confidence,
+      reportCount: confirmedTimestamps.reportCount,
+    })
     .from(confirmedTimestamps)
     .where(eq(confirmedTimestamps.platformContentId, pc[0].id))
 

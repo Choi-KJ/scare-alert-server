@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '../db/client'
 import { platformContents, submissions } from '../db/schema'
+import { recomputeConfirmed } from '../lib/aggregate'
 
 // 서비스 레이어 (Spring의 @Service). 라우트는 이 함수들만 호출하고, DB 접근은 여기서.
 
@@ -41,4 +42,7 @@ export async function createSubmission(input: SubmissionInput): Promise<void> {
     intensity: input.intensity,
     sessionId: input.sessionId,
   })
+  // 제보 후 해당 콘텐츠를 즉시 재집계 → confirmed_timestamps 갱신.
+  // (MVP: 소규모라 매 제보마다 재계산. 규모 커지면 배치/큐로 전환)
+  await recomputeConfirmed(platformContentId)
 }
