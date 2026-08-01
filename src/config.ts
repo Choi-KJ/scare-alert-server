@@ -10,4 +10,9 @@ export const config = {
     password: process.env.DB_PASSWORD ?? '',
     database: process.env.DB_NAME ?? 'scare_alert',
   },
+  // 관리자 페이지(/admin) Basic Auth 계정. 서버에만 보관.
+  admin: {
+    user: process.env.ADMIN_USER ?? '',
+    password: process.env.ADMIN_PASSWORD ?? '',
+  },
 }
