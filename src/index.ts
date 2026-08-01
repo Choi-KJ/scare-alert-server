@@ -7,6 +7,7 @@ import { config } from './config'
 import { adminRoute } from './routes/admin'
 import { submissionsRoute } from './routes/submissions'
 import { timestampsRoute } from './routes/timestamps'
+import { seedFirstAdmin } from './services/adminService'
 
 // 앱 진입점. 하나의 Hono 앱이 웹사이트(정적) + API를 겸한다.
 const app = new Hono()
@@ -29,6 +30,11 @@ app.route('/admin', adminRoute)
 
 // 정적 사이트 (public/) — 랜딩 등. index.html이 '/'로 서빙된다.
 app.use('/*', serveStatic({ root: './public' }))
+
+// admins 테이블이 비었으면 .env 계정으로 첫 관리자 시딩
+seedFirstAdmin(config.admin.user, config.admin.password).catch((e) =>
+  console.error('[admin] 시딩 실패:', e),
+)
 
 serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`[3,2,1 와!] server running → http://localhost:${info.port}`)

@@ -9,6 +9,16 @@ import {
 /** 점프스케어 강도 — 확장의 ScareIntensity와 동일하게 유지 */
 export const INTENSITY = ['mild', 'moderate', 'intense'] as const
 
+/** 관리자 계정 (관리자 페이지 로그인). 비밀번호는 bcrypt 해시로만 저장한다. */
+export const admins = mysqlTable('admins', {
+  id: int('id').primaryKey().autoincrement(),
+  username: varchar('username', { length: 64 }).notNull(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  adminsUsernameUq: uniqueIndex('admins_username_uq').on(t.username),
+}))
+
 /** 표시용 canonical 영화 (여러 플랫폼 콘텐츠를 묶는 상위 개념) */
 export const movies = mysqlTable('movies', {
   id: int('id').primaryKey().autoincrement(),

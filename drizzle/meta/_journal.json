@@ -15,6 +15,13 @@
       "when": 1785561954159,
       "tag": "0001_quiet_madame_web",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1785563116057,
+      "tag": "0002_even_the_renegades",
+      "breakpoints": true
     }
   ]
 }
