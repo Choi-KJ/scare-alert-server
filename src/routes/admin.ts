@@ -1,6 +1,8 @@
+import { getConnInfo } from '@hono/node-server/conninfo'
 import { Hono } from 'hono'
 import { deleteCookie, getSignedCookie, setSignedCookie } from 'hono/cookie'
 import { config } from '../config'
+import { checkLogin, recordFailure, recordSuccess } from '../lib/loginRateLimit'
 import {
   countAdmins,
   createAdmin,
@@ -28,14 +30,29 @@ adminRoute.use('*', async (c, next) => {
 })
 
 // --- 로그인 페이지 ---
-adminRoute.get('/login', (c) => c.html(loginPage(c.req.query('error') === '1')))
+adminRoute.get('/login', (c) => {
+  const error = c.req.query('error') === '1'
+  const lockedMins = Number(c.req.query('locked') ?? 0)
+  return c.html(loginPage(error, lockedMins))
+})
 
 adminRoute.post('/login', async (c) => {
+  // 무차별 대입 방지: IP당 실패 횟수 제한 (프록시 뒤에선 x-forwarded-for 신뢰 설정 필요)
+  const ip = getConnInfo(c).remote.address ?? 'unknown'
+  const status = checkLogin(ip)
+  if (status.locked) {
+    return c.redirect('/admin/login?locked=' + Math.ceil(status.retryAfterMs / 60000))
+  }
+
   const body = await c.req.parseBody()
   const user = String(body.username ?? '')
   const pass = String(body.password ?? '')
   const ok = await verifyAdmin(user, pass) // DB의 admins 테이블 + bcrypt 검증
-  if (!ok) return c.redirect('/admin/login?error=1')
+  if (!ok) {
+    recordFailure(ip)
+    return c.redirect('/admin/login?error=1')
+  }
+  recordSuccess(ip)
 
   await setSignedCookie(c, COOKIE, 'ok', SECRET, {
     httpOnly: true,
@@ -58,7 +75,7 @@ adminRoute.get('/', (c) =>
   c.html(
     page(
       '홈',
-      `<h1>321와 Admin</h1><p class="muted">로그인됨 ✓ 콘텐츠/대시보드 페이지는 이후 단계에서 구현.</p>
+      `<h1>3,2,1 와! Admin</h1><p class="muted">로그인됨 ✓ 콘텐츠/대시보드 페이지는 이후 단계에서 구현.</p>
        <p><a class="link" href="/admin/admins">관리자 관리 →</a></p>`,
     ),
   ),
@@ -136,7 +153,7 @@ function esc(s: string): string {
 function page(title: string, body: string): string {
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>321와 Admin — ${esc(title)}</title>
+<title>3,2,1 와! Admin — ${esc(title)}</title>
 <style>
   :root{ --bg:#0a0a12; --panel:#12121d; --ink:#f5f3ed; --muted:#8b8996; --marquee:#f2b705;
     --line:rgba(245,243,237,0.12); --line-strong:rgba(245,243,237,0.18); --danger:#c0453b; }
@@ -166,7 +183,7 @@ function page(title: string, body: string): string {
 </style></head>
 <body>
   <div class="topbar">
-    <div class="brand"><b>321와</b> Admin</div>
+    <div class="brand"><b>3,2,1 와!</b> Admin</div>
     <div><a class="link" href="/admin">홈</a> &nbsp; <a class="link" href="/admin/logout">로그아웃</a></div>
   </div>
   <div class="wrap">${body}</div>
@@ -174,11 +191,17 @@ function page(title: string, body: string): string {
 }
 
 // 로그인 페이지 HTML (다크 + 앰버 톤)
-function loginPage(error: boolean): string {
+function loginPage(error: boolean, lockedMins: number): string {
+  const notice =
+    lockedMins > 0
+      ? `<div class="notice locked">시도가 너무 많습니다. 약 ${lockedMins}분 후 다시 시도해 주세요.</div>`
+      : error
+        ? `<div class="notice err">아이디 또는 비밀번호가 올바르지 않습니다.</div>`
+        : ''
   return `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>321와 Admin — 로그인</title>
+<title>3,2,1 와! — 로그인</title>
 <style>
   :root{ --bg:#0a0a12; --panel:#12121d; --ink:#f5f3ed; --muted:#8b8996;
     --marquee:#f2b705; --line:rgba(245,243,237,0.14); --danger:#e88; }
@@ -197,17 +220,19 @@ function loginPage(error: boolean): string {
   button{width:100%;margin-top:22px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;
     color:#1a1400;background:var(--marquee);border:none;border-radius:8px;padding:11px}
   button:hover{filter:brightness(1.06)}
-  .err{color:var(--danger);font-size:12.5px;margin-top:12px;${error ? '' : 'display:none'}}
+  .notice{font-size:12.5px;margin-top:14px;padding:9px 11px;border-radius:8px}
+  .notice.err{color:var(--danger);background:rgba(192,69,59,0.12);border:1px solid rgba(192,69,59,0.3)}
+  .notice.locked{color:var(--marquee);background:rgba(242,183,5,0.12);border:1px solid rgba(242,183,5,0.3)}
 </style></head>
 <body>
   <form class="card" method="post" action="/admin/login">
-    <div class="brand"><b>321와</b> Admin</div>
-    <div class="sub">관리자 로그인</div>
+    <div class="brand"><b>3,2,1 와!</b></div>
+    <div class="sub">로그인</div>
     <label for="u">아이디</label>
     <input id="u" name="username" autocomplete="username" autofocus />
     <label for="p">비밀번호</label>
     <input id="p" name="password" type="password" autocomplete="current-password" />
-    <div class="err">아이디 또는 비밀번호가 올바르지 않습니다.</div>
+    ${notice}
     <button type="submit">로그인</button>
   </form>
 </body></html>`
