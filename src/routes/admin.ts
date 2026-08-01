@@ -70,13 +70,13 @@ adminRoute.get('/logout', (c) => {
   return c.redirect('/admin/login')
 })
 
-// --- 관리자 홈 (임시). 콘텐츠/대시보드 페이지는 이후 단계(③)에서 구현. ---
+// --- 대시보드 (로그인 후 첫 화면). 내용은 이후 작업 예정. ---
 adminRoute.get('/', (c) =>
   c.html(
-    page(
-      '홈',
-      `<h1>3,2,1 와! Admin</h1><p class="muted">로그인됨 ✓ 콘텐츠/대시보드 페이지는 이후 단계에서 구현.</p>
-       <p><a class="link" href="/admin/admins">관리자 관리 →</a></p>`,
+    shell(
+      'dashboard',
+      '대시보드',
+      `<p class="muted">대시보드 내용은 이후 작업 예정입니다.</p>`,
     ),
   ),
 )
@@ -100,10 +100,10 @@ adminRoute.get('/admins', async (c) => {
     )
     .join('')
   return c.html(
-    page(
+    shell(
+      'admins',
       '관리자 관리',
-      `<h1>관리자 관리</h1>
-       ${notice}
+      `${notice}
        <table>
          <thead><tr><th>ID</th><th>아이디</th><th>생성</th><th></th></tr></thead>
          <tbody>${list}</tbody>
@@ -149,23 +149,52 @@ function esc(s: string): string {
   )
 }
 
-// 관리자 공통 레이아웃 (다크 + 앰버, 실무형)
-function page(title: string, body: string): string {
+// 관리자 공통 레이아웃 (좌측 사이드바 + 메인). active = 현재 메뉴 키.
+function shell(active: string, title: string, body: string): string {
+  const items = [
+    { key: 'dashboard', label: '대시보드', href: '/admin', ic: '▦' },
+    { key: 'contents', label: '콘텐츠', href: '#', ic: '🎬' },
+    { key: 'review', label: '제보 검수', href: '#', ic: '🔎' },
+    { key: 'admins', label: '관리자 관리', href: '/admin/admins', ic: '⚙' },
+  ]
+  const nav = items
+    .map(
+      (n) =>
+        `<a class="${n.key === active ? 'active' : ''}" href="${n.href}"><span class="ic">${n.ic}</span> ${n.label}</a>`,
+    )
+    .join('')
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>3,2,1 와! Admin — ${esc(title)}</title>
+<title>3,2,1 와! — ${esc(title)}</title>
 <style>
-  :root{ --bg:#0a0a12; --panel:#12121d; --ink:#f5f3ed; --muted:#8b8996; --marquee:#f2b705;
-    --line:rgba(245,243,237,0.12); --line-strong:rgba(245,243,237,0.18); --danger:#c0453b; }
+  :root{ --bg:#0a0a12; --panel:#12121d; --panel-2:#181826; --ink:#f5f3ed; --muted:#8b8996;
+    --marquee:#f2b705; --line:rgba(245,243,237,0.12); --line-strong:rgba(245,243,237,0.18); --danger:#c0453b; --sidebar-w:220px; }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,sans-serif;font-size:14px}
-  .topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 28px;border-bottom:1px solid var(--line)}
-  .topbar .brand{font-weight:700}.topbar .brand b{color:var(--marquee)}
-  .wrap{max-width:720px;margin:0 auto;padding:26px 28px 80px}
-  h1{font-size:20px;margin-bottom:14px}
-  h2{font-size:15px;margin:26px 0 12px}
+  a{text-decoration:none;color:inherit}
   .muted{color:var(--muted)}
-  .link{color:var(--marquee);font-weight:600;text-decoration:none}
+  .link{color:var(--marquee);font-weight:600}
+  .app{display:flex;min-height:100vh}
+  /* 사이드바 */
+  .sidebar{width:var(--sidebar-w);flex:none;border-right:1px solid var(--line);background:var(--panel);
+    position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:18px 14px}
+  .sidebar .brand{font-weight:700;font-size:16px;padding:6px 10px 16px}
+  .sidebar .brand b{color:var(--marquee)} .sidebar .brand .tag{color:var(--muted);font-weight:600;font-size:12px}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav a{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;font-size:13.5px;color:var(--muted)}
+  .nav a:hover{background:rgba(245,243,237,0.05);color:var(--ink)}
+  .nav a.active{background:rgba(242,183,5,0.12);color:var(--marquee);font-weight:600}
+  .nav a .ic{width:16px;text-align:center;opacity:.9}
+  .nav .sep{height:1px;background:var(--line);margin:10px 6px}
+  .sidebar .foot{margin-top:auto;padding:8px 10px;font-size:12px;color:var(--muted)}
+  /* 메인 */
+  .main{flex:1;min-width:0}
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 28px;
+    border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(10,10,18,.9);z-index:5}
+  .topbar h1{font-size:16px;font-weight:700}
+  .topbar .who{font-size:13px;color:var(--muted)}
+  .content{max-width:820px;padding:24px 28px 80px}
+  h2{font-size:15px;margin:26px 0 12px}
   table{width:100%;border-collapse:collapse;margin-bottom:8px}
   th{text-align:left;font-size:12px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)}
   td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
@@ -174,19 +203,25 @@ function page(title: string, body: string): string {
   .btn-primary{background:var(--marquee);color:#1a1400;border-color:var(--marquee)}
   .btn-danger{color:#e88;border-color:rgba(192,69,59,0.5)}
   .btn-danger:hover:not([disabled]){background:rgba(192,69,59,0.14)}
-  .btn[disabled]{opacity:0.4;cursor:not-allowed}
+  .btn[disabled]{opacity:.4;cursor:not-allowed}
   form.add{display:flex;gap:10px;flex-wrap:wrap}
-  form.add input{font:inherit;font-size:13px;color:var(--ink);background:#181826;
+  form.add input{font:inherit;font-size:13px;color:var(--ink);background:var(--panel-2);
     border:1px solid var(--line-strong);border-radius:7px;padding:8px 11px}
   .notice{background:rgba(242,183,5,0.12);color:var(--marquee);border:1px solid rgba(242,183,5,0.3);
     border-radius:8px;padding:9px 12px;margin-bottom:16px;font-size:13px}
 </style></head>
 <body>
-  <div class="topbar">
-    <div class="brand"><b>3,2,1 와!</b> Admin</div>
-    <div><a class="link" href="/admin">홈</a> &nbsp; <a class="link" href="/admin/logout">로그아웃</a></div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><b>3,2,1 와!</b> <span class="tag">Admin</span></div>
+      <nav class="nav">${nav}<div class="sep"></div><a href="/admin/logout"><span class="ic">⎋</span> 로그아웃</a></nav>
+      <div class="foot">v0.0.1 · dev</div>
+    </aside>
+    <main class="main">
+      <div class="topbar"><h1>${esc(title)}</h1><div class="who">admin</div></div>
+      <div class="content">${body}</div>
+    </main>
   </div>
-  <div class="wrap">${body}</div>
 </body></html>`
 }
 
