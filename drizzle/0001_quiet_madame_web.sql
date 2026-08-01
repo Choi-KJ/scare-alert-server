@@ -1,0 +1,1 @@
+ALTER TABLE `confirmed_timestamps` ADD `source` enum('aggregated','manual') DEFAULT 'aggregated' NOT NULL;

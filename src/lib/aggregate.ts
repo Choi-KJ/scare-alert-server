@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../db/client'
 import { confirmedTimestamps, submissions } from '../db/schema'
 
@@ -83,7 +83,15 @@ export async function recomputeConfirmed(
 
   const points = aggregateReports(rows, options)
 
-  await db.delete(confirmedTimestamps).where(eq(confirmedTimestamps.platformContentId, platformContentId))
+  // 집계 결과만 갈아엎는다. 관리자 수동 등록(source='manual')은 건드리지 않아 보존됨.
+  await db
+    .delete(confirmedTimestamps)
+    .where(
+      and(
+        eq(confirmedTimestamps.platformContentId, platformContentId),
+        eq(confirmedTimestamps.source, 'aggregated'),
+      ),
+    )
   if (points.length > 0) {
     await db.insert(confirmedTimestamps).values(
       points.map((p) => ({
@@ -92,6 +100,7 @@ export async function recomputeConfirmed(
         confidence: p.confidence,
         reportCount: p.reportCount,
         status: 'confirmed',
+        source: 'aggregated' as const,
       })),
     )
   }

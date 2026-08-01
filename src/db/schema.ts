@@ -48,6 +48,8 @@ export const confirmedTimestamps = mysqlTable('confirmed_timestamps', {
   confidence: double('confidence').notNull().default(0),
   reportCount: int('report_count').notNull().default(0),
   status: varchar('status', { length: 16 }).notNull().default('confirmed'),
+  // 출처: 'aggregated'(집계로 생성 — 재집계 시 삭제/재생성) | 'manual'(관리자 수동 — 재집계에도 보존)
+  source: mysqlEnum('source', ['aggregated', 'manual']).notNull().default('aggregated'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   confirmedPcIdx: index('confirmed_pc_idx').on(t.platformContentId),
