@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { db } from '../db/client'
 import { adminLoginAttempts, admins } from '../db/schema'
 
@@ -42,6 +42,17 @@ export async function deleteAdmin(id: number): Promise<void> {
 /** 로그인 시도 1건 기록 (성공/실패 모두). 비밀번호는 저장하지 않는다. */
 export async function recordLoginAttempt(username: string, success: boolean, ip: string): Promise<void> {
   await db.insert(adminLoginAttempts).values({ username: username.slice(0, 64), success, ip: ip.slice(0, 64) })
+}
+
+/** 특정 아이디의 마지막 성공 로그인 시각 (없으면 null) */
+export async function getLastLogin(username: string): Promise<Date | null> {
+  const rows = await db
+    .select({ createdAt: adminLoginAttempts.createdAt })
+    .from(adminLoginAttempts)
+    .where(and(eq(adminLoginAttempts.username, username), eq(adminLoginAttempts.success, true)))
+    .orderBy(desc(adminLoginAttempts.id))
+    .limit(1)
+  return rows.length ? rows[0].createdAt : null
 }
 
 /** 특정 아이디의 최근 로그인 시도 이력 */

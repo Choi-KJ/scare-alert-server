@@ -7,6 +7,7 @@ import {
   countAdmins,
   createAdmin,
   deleteAdmin,
+  getLastLogin,
   getLoginAttempts,
   listAdmins,
   recordLoginAttempt,
@@ -89,14 +90,18 @@ adminRoute.get('/', (c) =>
 // --- 관리자 관리 (목록/추가/삭제) ---
 adminRoute.get('/admins', async (c) => {
   const rows = await listAdmins()
+  const withLogin = await Promise.all(
+    rows.map(async (a) => ({ ...a, lastLogin: await getLastLogin(a.username) })),
+  )
   const msg = c.req.query('msg')
   const notice = msg ? `<div class="notice">${esc(decodeURIComponent(msg))}</div>` : ''
-  const list = rows
+  const fmt = (d: Date) => new Date(d).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+  const list = withLogin
     .map(
       (a) => `<tr>
         <td>${a.id}</td>
         <td><a href="#" class="user-link" data-username="${esc(a.username)}">${esc(a.username)}</a></td>
-        <td class="muted">${new Date(a.createdAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</td>
+        <td class="muted">${a.lastLogin ? fmt(a.lastLogin) : '<span class="muted">기록 없음</span>'}</td>
         <td style="text-align:right">
           <form method="post" action="/admin/admins/${a.id}/delete" onsubmit="return confirm('삭제할까요?')">
             <button class="btn btn-danger"${rows.length <= 1 ? ' disabled title="마지막 관리자는 삭제 불가"' : ''}>삭제</button>
@@ -110,7 +115,7 @@ adminRoute.get('/admins', async (c) => {
       '관리자 관리',
       `${notice}
        <table>
-         <thead><tr><th>ID</th><th>아이디</th><th>생성</th><th></th></tr></thead>
+         <thead><tr><th>ID</th><th>아이디</th><th>최종 로그인</th><th></th></tr></thead>
          <tbody>${list}</tbody>
        </table>
        <p class="muted" style="font-size:12.5px;margin-top:-2px">아이디를 클릭하면 로그인 이력을 볼 수 있습니다.</p>
