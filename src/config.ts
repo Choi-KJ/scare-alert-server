@@ -10,9 +10,11 @@ export const config = {
     password: process.env.DB_PASSWORD ?? '',
     database: process.env.DB_NAME ?? 'scare_alert',
   },
-  // 관리자 페이지(/admin) Basic Auth 계정. 서버에만 보관.
+  // 관리자 페이지(/admin) 로그인 계정 + 세션 쿠키 서명 시크릿. 서버에만 보관.
   admin: {
     user: process.env.ADMIN_USER ?? '',
     password: process.env.ADMIN_PASSWORD ?? '',
+    // 세션 쿠키 서명용. 운영에선 반드시 .env의 SESSION_SECRET을 설정할 것.
+    sessionSecret: process.env.SESSION_SECRET ?? 'dev-insecure-secret-change-me',
   },
 }
