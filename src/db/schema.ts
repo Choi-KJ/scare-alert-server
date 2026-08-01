@@ -1,5 +1,5 @@
 import {
-  mysqlTable, int, varchar, double, mysqlEnum, timestamp, uniqueIndex, index,
+  mysqlTable, int, varchar, double, mysqlEnum, timestamp, uniqueIndex, index, boolean,
 } from 'drizzle-orm/mysql-core'
 
 // Drizzle 스키마 = 테이블 정의 + 타입 소스. Spring의 @Entity 자리(단, 애노테이션이 아니라 코드).
@@ -17,6 +17,17 @@ export const admins = mysqlTable('admins', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   adminsUsernameUq: uniqueIndex('admins_username_uq').on(t.username),
+}))
+
+/** 관리자 로그인 시도 감사 로그. 비밀번호는 저장하지 않는다. */
+export const adminLoginAttempts = mysqlTable('admin_login_attempts', {
+  id: int('id').primaryKey().autoincrement(),
+  username: varchar('username', { length: 64 }).notNull(), // 시도한 아이디(존재하지 않아도 기록)
+  success: boolean('success').notNull(),
+  ip: varchar('ip', { length: 64 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  loginAttemptsUsernameIdx: index('login_attempts_username_idx').on(t.username),
 }))
 
 /** 표시용 canonical 영화 (여러 플랫폼 콘텐츠를 묶는 상위 개념) */

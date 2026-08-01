@@ -7,7 +7,9 @@ import {
   countAdmins,
   createAdmin,
   deleteAdmin,
+  getLoginAttempts,
   listAdmins,
+  recordLoginAttempt,
   usernameExists,
   verifyAdmin,
 } from '../services/adminService'
@@ -39,15 +41,18 @@ adminRoute.get('/login', (c) => {
 adminRoute.post('/login', async (c) => {
   // 무차별 대입 방지: IP당 실패 횟수 제한 (프록시 뒤에선 x-forwarded-for 신뢰 설정 필요)
   const ip = getConnInfo(c).remote.address ?? 'unknown'
-  const status = checkLogin(ip)
-  if (status.locked) {
-    return c.redirect('/admin/login?locked=' + Math.ceil(status.retryAfterMs / 60000))
-  }
-
   const body = await c.req.parseBody()
   const user = String(body.username ?? '')
   const pass = String(body.password ?? '')
+
+  const status = checkLogin(ip)
+  if (status.locked) {
+    await recordLoginAttempt(user, false, ip) // 잠긴 상태의 시도도 감사 로그에 남김
+    return c.redirect('/admin/login?locked=' + Math.ceil(status.retryAfterMs / 60000))
+  }
+
   const ok = await verifyAdmin(user, pass) // DB의 admins 테이블 + bcrypt 검증
+  await recordLoginAttempt(user, ok, ip) // 성공/실패 모두 기록 (비밀번호는 저장 안 함)
   if (!ok) {
     recordFailure(ip)
     return c.redirect('/admin/login?error=1')
@@ -90,7 +95,7 @@ adminRoute.get('/admins', async (c) => {
     .map(
       (a) => `<tr>
         <td>${a.id}</td>
-        <td>${esc(a.username)}</td>
+        <td><a href="#" class="user-link" data-username="${esc(a.username)}">${esc(a.username)}</a></td>
         <td class="muted">${new Date(a.createdAt).toLocaleString('ko-KR')}</td>
         <td style="text-align:right">
           <form method="post" action="/admin/admins/${a.id}/delete" onsubmit="return confirm('삭제할까요?')">
@@ -108,12 +113,22 @@ adminRoute.get('/admins', async (c) => {
          <thead><tr><th>ID</th><th>아이디</th><th>생성</th><th></th></tr></thead>
          <tbody>${list}</tbody>
        </table>
+       <p class="muted" style="font-size:12.5px;margin-top:-2px">아이디를 클릭하면 로그인 이력을 볼 수 있습니다.</p>
        <h2>관리자 추가</h2>
        <form method="post" action="/admin/admins" class="add">
          <input name="username" placeholder="아이디" autocomplete="off" required />
          <input name="password" type="password" placeholder="비밀번호(6자 이상)" required />
          <button class="btn btn-primary">추가</button>
-       </form>`,
+       </form>
+       <div id="logModal" class="modal" hidden>
+         <div class="modal-panel">
+           <div class="modal-head"><span id="logTitle"></span><button class="btn btn-sm" id="logClose">닫기</button></div>
+           <div class="modal-body">
+             <table><thead><tr><th>시각</th><th>결과</th><th>IP</th></tr></thead><tbody id="logRows"></tbody></table>
+           </div>
+         </div>
+       </div>
+       <script>${loginLogScript}</script>`,
     ),
   )
 })
@@ -141,6 +156,52 @@ adminRoute.post('/admins/:id/delete', async (c) => {
   await deleteAdmin(id)
   return c.redirect('/admin/admins?msg=' + encodeURIComponent('삭제됨'))
 })
+
+// 특정 아이디의 로그인 이력 (관리 페이지 팝업에서 fetch) — JSON
+adminRoute.get('/login-log', async (c) => {
+  const username = c.req.query('username') ?? ''
+  if (!username) return c.json({ username, attempts: [] })
+  const attempts = await getLoginAttempts(username)
+  return c.json({ username, attempts })
+})
+
+// 관리 페이지 로그인 이력 팝업 스크립트 (아이디 클릭 → /admin/login-log fetch → 모달 표시).
+// 값은 textContent로 넣어 XSS를 피한다.
+const loginLogScript = `
+(function(){
+  var modal = document.getElementById('logModal');
+  if(!modal) return;
+  function closeLog(){ modal.hidden = true; }
+  document.getElementById('logClose').addEventListener('click', closeLog);
+  modal.addEventListener('click', function(e){ if(e.target === modal) closeLog(); });
+  document.querySelectorAll('.user-link').forEach(function(el){
+    el.addEventListener('click', function(e){ e.preventDefault(); openLog(el.getAttribute('data-username')); });
+  });
+  async function openLog(username){
+    document.getElementById('logTitle').textContent = username + ' — 로그인 이력';
+    var tbody = document.getElementById('logRows');
+    tbody.textContent = '';
+    modal.hidden = false;
+    function addFull(text, cls){
+      var tr = document.createElement('tr'); var td = document.createElement('td');
+      td.colSpan = 3; td.className = cls || 'muted'; td.textContent = text;
+      tr.appendChild(td); tbody.appendChild(tr);
+    }
+    try{
+      var res = await fetch('/admin/login-log?username=' + encodeURIComponent(username));
+      var data = await res.json();
+      if(!data.attempts || !data.attempts.length){ addFull('이력 없음'); return; }
+      data.attempts.forEach(function(a){
+        var tr = document.createElement('tr');
+        var t1 = document.createElement('td'); t1.textContent = new Date(a.createdAt).toLocaleString('ko-KR');
+        var t2 = document.createElement('td'); t2.textContent = a.success ? '성공' : '실패'; t2.className = a.success ? 'ok' : 'fail';
+        var t3 = document.createElement('td'); t3.className = 'muted'; t3.textContent = a.ip || '';
+        tr.appendChild(t1); tr.appendChild(t2); tr.appendChild(t3); tbody.appendChild(tr);
+      });
+    }catch(e){ addFull('불러오기 실패', 'fail'); }
+  }
+})();
+`
 
 // HTML 이스케이프 (사용자 입력 표시 시 XSS 방지)
 function esc(s: string): string {
@@ -209,6 +270,14 @@ function shell(active: string, title: string, body: string): string {
     border:1px solid var(--line-strong);border-radius:7px;padding:8px 11px}
   .notice{background:rgba(242,183,5,0.12);color:var(--marquee);border:1px solid rgba(242,183,5,0.3);
     border-radius:8px;padding:9px 12px;margin-bottom:16px;font-size:13px}
+  .btn-sm{padding:4px 10px;font-size:12px}
+  .user-link{color:var(--marquee);font-weight:600;cursor:pointer;border-bottom:1px dotted rgba(242,183,5,.4)}
+  .ok{color:#7fd6a2}.fail{color:#e88}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal[hidden]{display:none}
+  .modal-panel{background:var(--panel);border:1px solid var(--line-strong);border-radius:12px;width:min(560px,92vw);max-height:80vh;display:flex;flex-direction:column}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);font-weight:700}
+  .modal-body{padding:8px 18px 18px;overflow:auto}
 </style></head>
 <body>
   <div class="app">
