@@ -40,6 +40,8 @@
 
 ## 2. 관리자 페이지
 
+> **선결 과제 — 인증:** 관리자 페이지는 아무나 접근하면 안 되므로 인증이 필요하다. 현재 서버엔 인증이 전혀 없어, 관리자 페이지가 **인증을 도입하는 첫 기능**이 된다. (간단히는 관리자 비밀번호/세션 또는 Basic Auth부터 → 이후 정식 로그인)
+
 ### 2.1 제보 검수
 - 사용자들이 제보한 콘텐츠/시점 목록 확인.
 - 클러스터(±N초로 묶인 제보 그룹) 단위로 보고, **확정/보류/반려** 처리.
@@ -49,9 +51,23 @@
 - 집계 임계값을 넘은 클러스터를 **확정**으로 승격 (자동 + 수동 오버라이드).
 - 상태 배지 관리 (`제보중`/`확정`). 관리자 수동 인증 배지는 이후 확장.
 
-### 2.3 (참고) 타임스탬프 조회 API — 거의 해결됨
-- 확장은 이미 `/watch/{id}`에서 콘텐츠ID를 추출 중.
-- 서버에 `GET /timestamps?platform=<>&contentId=<>` 엔드포인트만 추가하면 됨. **낮은 리스크** — 관리자 기능이 아니라 "서버 API 설계" 항목.
+### 2.3 수동 타임스탬프 등록 (콜드스타트 시딩)
+초기엔 제보가 없어 알림이 안 뜨는 **콜드스타트** 구간이 있다. 관리자가 **수동으로 타임스탬프를 등록**해 부트스트랩하고, 활성 사용자가 늘면 수동 등록 빈도는 자연히 줄어든다. (CLAUDE.md의 "시드 데이터 용도 예외"에 해당 — 장기 모델은 크라우드소싱 유지)
+
+**기능**
+- 콘텐츠 선택/생성 (`platform` + `contentId`)
+- 현재 확정 지점 목록 (aggregated / manual 구분 표시)
+- 수동 타임스탬프 추가 (at, 강도, 메모), 수정/삭제
+- (선택) 임계값 못 넘은 제보 클러스터를 수동으로 확정 승격
+
+**⚠️ 설계 핵심 — 재집계와의 충돌 방지**
+현재 `recomputeConfirmed`는 제보가 들어올 때마다 해당 콘텐츠의 `confirmed_timestamps`를 **전부 지우고 다시 계산**한다. 수동 등록이 다음 제보 때 삭제되지 않도록:
+- `confirmed_timestamps`에 **`source` 컬럼**(`'aggregated'` | `'manual'`) 추가
+- 재집계는 **`source='aggregated'` 행만** 삭제/재생성 → `manual`은 보존
+- `GET /api/timestamps`는 둘을 **합쳐서** 반환 (확장은 소스 구분 없이 그대로 사용 → 확장 변경 불필요)
+
+### 2.4 (참고) 타임스탬프 조회 API — 구현됨
+- `GET /api/timestamps?platform=<>&contentId=<>` 구현 완료. 확장이 확정 데이터를 조회해 오버레이 카운트다운에 사용 중.
 
 ---
 
@@ -83,7 +99,8 @@
 - **movies** (표시용, canonical 묶음): `id`, `title`, `poster`, (선택) 외부 메타데이터.
 - **platform_contents**: `id`, `movie_id`(→movies), `platform`, `content_id`(예: netflix /watch id). ← 타임스탬프의 실제 소속.
 - **submissions** (원시 제보): `id`, `platform_content_id`, `at_seconds`, `intensity`, `session_id`, `created_at`.
-- **confirmed_timestamps** (확정 결과): `id`, `platform_content_id`, `at_seconds`, `confidence`, `report_count`, `status`.
+- **confirmed_timestamps** (확정 결과): `id`, `platform_content_id`, `at_seconds`, `confidence`, `report_count`, `status`, **`source`**(`'aggregated'` | `'manual'`, 예정).
+  - `source='aggregated'`: 집계로 생성 — 재집계 시 삭제/재생성됨. `source='manual'`: 관리자 수동 등록(2.3) — 재집계에도 보존됨.
 
 목록 페이지는 `movies` 단위로 묶어 보여주고, 상세/알림은 `platform_contents` → `confirmed_timestamps` 를 사용.
 
@@ -113,3 +130,5 @@
 - [ ] 상세 페이지에서 확정 시각을 그대로 노출할지 vs 요약만.
 - [ ] 목록에 없는 영화의 최초 제보(콘텐츠 메타데이터: 제목/포스터)를 어떻게 채울지 (관리자 입력? 외부 API?).
 - [ ] 플랫폼별 `content_id` 추출 방식 (Netflix는 확인됨, 웨이브/티빙/왓챠/쿠팡플레이는 조사 필요).
+- [ ] **관리자 인증 방식** 결정 (Basic Auth/세션/정식 로그인) — 관리자 페이지(2장)의 선결 과제.
+- [ ] **`confirmed_timestamps.source` 컬럼 추가** (aggregated/manual) — 수동 등록(2.3)이 재집계에 안 지워지게. 마이그레이션 + `recomputeConfirmed`가 aggregated만 지우도록 수정 필요.
