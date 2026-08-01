@@ -1,5 +1,5 @@
 import { getConnInfo } from '@hono/node-server/conninfo'
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { deleteCookie, getSignedCookie, setSignedCookie } from 'hono/cookie'
 import { config } from '../config'
 import { checkLogin, recordFailure, recordSuccess } from '../lib/loginRateLimit'
@@ -39,8 +39,8 @@ adminRoute.get('/login', (c) => {
 })
 
 adminRoute.post('/login', async (c) => {
-  // 무차별 대입 방지: IP당 실패 횟수 제한 (프록시 뒤에선 x-forwarded-for 신뢰 설정 필요)
-  const ip = getConnInfo(c).remote.address ?? 'unknown'
+  // 무차별 대입 방지: IP당 실패 횟수 제한
+  const ip = clientIp(c)
   const body = await c.req.parseBody()
   const user = String(body.username ?? '')
   const pass = String(body.password ?? '')
@@ -96,7 +96,7 @@ adminRoute.get('/admins', async (c) => {
       (a) => `<tr>
         <td>${a.id}</td>
         <td><a href="#" class="user-link" data-username="${esc(a.username)}">${esc(a.username)}</a></td>
-        <td class="muted">${new Date(a.createdAt).toLocaleString('ko-KR')}</td>
+        <td class="muted">${new Date(a.createdAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</td>
         <td style="text-align:right">
           <form method="post" action="/admin/admins/${a.id}/delete" onsubmit="return confirm('삭제할까요?')">
             <button class="btn btn-danger"${rows.length <= 1 ? ' disabled title="마지막 관리자는 삭제 불가"' : ''}>삭제</button>
@@ -193,7 +193,7 @@ const loginLogScript = `
       if(!data.attempts || !data.attempts.length){ addFull('이력 없음'); return; }
       data.attempts.forEach(function(a){
         var tr = document.createElement('tr');
-        var t1 = document.createElement('td'); t1.textContent = new Date(a.createdAt).toLocaleString('ko-KR');
+        var t1 = document.createElement('td'); t1.textContent = new Date(a.createdAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
         var t2 = document.createElement('td'); t2.textContent = a.success ? '성공' : '실패'; t2.className = a.success ? 'ok' : 'fail';
         var t3 = document.createElement('td'); t3.className = 'muted'; t3.textContent = a.ip || '';
         tr.appendChild(t1); tr.appendChild(t2); tr.appendChild(t3); tbody.appendChild(tr);
@@ -202,6 +202,14 @@ const loginLogScript = `
   }
 })();
 `
+
+// 클라이언트 IP 추출. 프록시 뒤에선 X-Forwarded-For(첫 항목)를 우선 사용.
+// (X-Forwarded-For는 신뢰된 프록시 뒤에서만 신뢰할 것 — 로깅 용도라 허용)
+function clientIp(c: Context): string {
+  const xff = c.req.header('x-forwarded-for')
+  const raw = xff ? (xff.split(',')[0] ?? '').trim() : (getConnInfo(c).remote.address ?? 'unknown')
+  return raw.replace(/^::ffff:/, '') // IPv4-mapped IPv6(::ffff:1.2.3.4) → 1.2.3.4
+}
 
 // HTML 이스케이프 (사용자 입력 표시 시 XSS 방지)
 function esc(s: string): string {
