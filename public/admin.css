@@ -1,0 +1,77 @@
+/* 3,2,1 와! 관리자 공통 스타일 (로그인 + 사이드바 쉘). 서버 렌더 페이지들이 <link>로 공유. */
+:root{
+  --bg:#0a0a12; --panel:#12121d; --panel-2:#181826; --ink:#f5f3ed; --muted:#8b8996;
+  --marquee:#f2b705; --line:rgba(245,243,237,0.12); --line-strong:rgba(245,243,237,0.18);
+  --danger:#c0453b; --sidebar-w:220px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,sans-serif;font-size:14px}
+a{text-decoration:none;color:inherit}
+.muted{color:var(--muted)}
+.link{color:var(--marquee);font-weight:600}
+
+/* ---------- 공통 컴포넌트 ---------- */
+h2{font-size:15px;margin:26px 0 12px}
+table{width:100%;border-collapse:collapse;margin-bottom:8px}
+th{text-align:left;font-size:12px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.btn{font:inherit;font-size:13px;font-weight:600;border-radius:7px;padding:7px 12px;cursor:pointer;
+  border:1px solid var(--line-strong);background:transparent;color:var(--ink)}
+.btn-primary{background:var(--marquee);color:#1a1400;border-color:var(--marquee)}
+.btn-danger{color:#e88;border-color:rgba(192,69,59,0.5)}
+.btn-danger:hover:not([disabled]){background:rgba(192,69,59,0.14)}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn-sm{padding:4px 10px;font-size:12px}
+form.add{display:flex;gap:10px;flex-wrap:wrap}
+form.add input{font:inherit;font-size:13px;color:var(--ink);background:var(--panel-2);
+  border:1px solid var(--line-strong);border-radius:7px;padding:8px 11px}
+.notice{border-radius:8px;padding:9px 12px;font-size:13px;margin:14px 0;
+  background:rgba(242,183,5,0.12);color:var(--marquee);border:1px solid rgba(242,183,5,0.3)}
+.notice.err{color:#e88;background:rgba(192,69,59,0.12);border-color:rgba(192,69,59,0.3)}
+.ok{color:#7fd6a2}
+.fail{color:#e88}
+.user-link{color:var(--marquee);font-weight:600;cursor:pointer;border-bottom:1px dotted rgba(242,183,5,.4)}
+
+/* ---------- 사이드바 쉘 ---------- */
+.app{display:flex;min-height:100vh}
+.sidebar{width:var(--sidebar-w);flex:none;border-right:1px solid var(--line);background:var(--panel);
+  position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:18px 14px}
+.sidebar .brand{font-weight:700;font-size:16px;padding:6px 10px 16px}
+.sidebar .brand b{color:var(--marquee)}
+.sidebar .brand .tag{color:var(--muted);font-weight:600;font-size:12px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;font-size:13.5px;color:var(--muted)}
+.nav a:hover{background:rgba(245,243,237,0.05);color:var(--ink)}
+.nav a.active{background:rgba(242,183,5,0.12);color:var(--marquee);font-weight:600}
+.nav a .ic{width:16px;text-align:center;opacity:.9}
+.nav .sep{height:1px;background:var(--line);margin:10px 6px}
+.sidebar .foot{margin-top:auto;padding:8px 10px;font-size:12px;color:var(--muted)}
+.main{flex:1;min-width:0}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 28px;
+  border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(10,10,18,.9);z-index:5}
+.topbar h1{font-size:16px;font-weight:700}
+.topbar .who{font-size:13px;color:var(--muted)}
+.content{max-width:820px;padding:24px 28px 80px}
+
+/* ---------- 모달 ---------- */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal[hidden]{display:none}
+.modal-panel{background:var(--panel);border:1px solid var(--line-strong);border-radius:12px;
+  width:min(560px,92vw);max-height:80vh;display:flex;flex-direction:column}
+.modal-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;
+  border-bottom:1px solid var(--line);font-weight:700}
+.modal-body{padding:8px 18px 18px;overflow:auto}
+
+/* ---------- 로그인 페이지 ---------- */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{width:100%;max-width:340px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px 26px}
+.card .brand{font-size:18px;font-weight:700;margin-bottom:4px}
+.card .brand b{color:var(--marquee)}
+.card .sub{color:var(--muted);font-size:13px;margin-bottom:22px}
+.card label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px}
+.card input{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--panel-2);
+  border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.card input:focus{outline:none;border-color:var(--marquee)}
+.card button{width:100%;margin-top:22px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;
+  color:#1a1400;background:var(--marquee);border:none;border-radius:8px;padding:11px}
+.card button:hover{filter:brightness(1.06)}

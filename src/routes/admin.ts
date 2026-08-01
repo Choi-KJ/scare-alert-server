@@ -265,58 +265,8 @@ function shell(active: string, title: string, body: string): string {
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>3,2,1 와! — ${esc(title)}</title>
-<style>
-  :root{ --bg:#0a0a12; --panel:#12121d; --panel-2:#181826; --ink:#f5f3ed; --muted:#8b8996;
-    --marquee:#f2b705; --line:rgba(245,243,237,0.12); --line-strong:rgba(245,243,237,0.18); --danger:#c0453b; --sidebar-w:220px; }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,sans-serif;font-size:14px}
-  a{text-decoration:none;color:inherit}
-  .muted{color:var(--muted)}
-  .link{color:var(--marquee);font-weight:600}
-  .app{display:flex;min-height:100vh}
-  /* 사이드바 */
-  .sidebar{width:var(--sidebar-w);flex:none;border-right:1px solid var(--line);background:var(--panel);
-    position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:18px 14px}
-  .sidebar .brand{font-weight:700;font-size:16px;padding:6px 10px 16px}
-  .sidebar .brand b{color:var(--marquee)} .sidebar .brand .tag{color:var(--muted);font-weight:600;font-size:12px}
-  .nav{display:flex;flex-direction:column;gap:2px}
-  .nav a{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;font-size:13.5px;color:var(--muted)}
-  .nav a:hover{background:rgba(245,243,237,0.05);color:var(--ink)}
-  .nav a.active{background:rgba(242,183,5,0.12);color:var(--marquee);font-weight:600}
-  .nav a .ic{width:16px;text-align:center;opacity:.9}
-  .nav .sep{height:1px;background:var(--line);margin:10px 6px}
-  .sidebar .foot{margin-top:auto;padding:8px 10px;font-size:12px;color:var(--muted)}
-  /* 메인 */
-  .main{flex:1;min-width:0}
-  .topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 28px;
-    border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(10,10,18,.9);z-index:5}
-  .topbar h1{font-size:16px;font-weight:700}
-  .topbar .who{font-size:13px;color:var(--muted)}
-  .content{max-width:820px;padding:24px 28px 80px}
-  h2{font-size:15px;margin:26px 0 12px}
-  table{width:100%;border-collapse:collapse;margin-bottom:8px}
-  th{text-align:left;font-size:12px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)}
-  td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
-  .btn{font:inherit;font-size:13px;font-weight:600;border-radius:7px;padding:7px 12px;cursor:pointer;
-    border:1px solid var(--line-strong);background:transparent;color:var(--ink)}
-  .btn-primary{background:var(--marquee);color:#1a1400;border-color:var(--marquee)}
-  .btn-danger{color:#e88;border-color:rgba(192,69,59,0.5)}
-  .btn-danger:hover:not([disabled]){background:rgba(192,69,59,0.14)}
-  .btn[disabled]{opacity:.4;cursor:not-allowed}
-  form.add{display:flex;gap:10px;flex-wrap:wrap}
-  form.add input{font:inherit;font-size:13px;color:var(--ink);background:var(--panel-2);
-    border:1px solid var(--line-strong);border-radius:7px;padding:8px 11px}
-  .notice{background:rgba(242,183,5,0.12);color:var(--marquee);border:1px solid rgba(242,183,5,0.3);
-    border-radius:8px;padding:9px 12px;margin-bottom:16px;font-size:13px}
-  .btn-sm{padding:4px 10px;font-size:12px}
-  .user-link{color:var(--marquee);font-weight:600;cursor:pointer;border-bottom:1px dotted rgba(242,183,5,.4)}
-  .ok{color:#7fd6a2}.fail{color:#e88}
-  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}
-  .modal[hidden]{display:none}
-  .modal-panel{background:var(--panel);border:1px solid var(--line-strong);border-radius:12px;width:min(560px,92vw);max-height:80vh;display:flex;flex-direction:column}
-  .modal-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);font-weight:700}
-  .modal-body{padding:8px 18px 18px;overflow:auto}
-</style></head>
+<link rel="stylesheet" href="/admin.css" />
+</head>
 <body>
   <div class="app">
     <aside class="sidebar">
@@ -344,38 +294,20 @@ function loginPage(error: boolean, lockedMins: number): string {
 <html lang="ko"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>3,2,1 와! — 로그인</title>
-<style>
-  :root{ --bg:#0a0a12; --panel:#12121d; --ink:#f5f3ed; --muted:#8b8996;
-    --marquee:#f2b705; --line:rgba(245,243,237,0.14); --danger:#e88; }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,sans-serif;
-    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-  .card{width:100%;max-width:340px;background:var(--panel);border:1px solid var(--line);
-    border-radius:12px;padding:28px 26px}
-  .brand{font-size:18px;font-weight:700;margin-bottom:4px}
-  .brand b{color:var(--marquee)}
-  .sub{color:var(--muted);font-size:13px;margin-bottom:22px}
-  label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px}
-  input{width:100%;font:inherit;font-size:14px;color:var(--ink);background:#181826;
-    border:1px solid var(--line);border-radius:8px;padding:10px 12px}
-  input:focus{outline:none;border-color:var(--marquee)}
-  button{width:100%;margin-top:22px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;
-    color:#1a1400;background:var(--marquee);border:none;border-radius:8px;padding:11px}
-  button:hover{filter:brightness(1.06)}
-  .notice{font-size:12.5px;margin-top:14px;padding:9px 11px;border-radius:8px}
-  .notice.err{color:var(--danger);background:rgba(192,69,59,0.12);border:1px solid rgba(192,69,59,0.3)}
-  .notice.locked{color:var(--marquee);background:rgba(242,183,5,0.12);border:1px solid rgba(242,183,5,0.3)}
-</style></head>
+<link rel="stylesheet" href="/admin.css" />
+</head>
 <body>
-  <form class="card" method="post" action="/admin/login">
-    <div class="brand"><b>3,2,1 와!</b></div>
-    <div class="sub">로그인</div>
-    <label for="u">아이디</label>
-    <input id="u" name="username" autocomplete="username" autofocus />
-    <label for="p">비밀번호</label>
-    <input id="p" name="password" type="password" autocomplete="current-password" />
-    ${notice}
-    <button type="submit">로그인</button>
-  </form>
+  <div class="login-wrap">
+    <form class="card" method="post" action="/admin/login">
+      <div class="brand"><b>3,2,1 와!</b></div>
+      <div class="sub">로그인</div>
+      <label for="u">아이디</label>
+      <input id="u" name="username" autocomplete="username" autofocus />
+      <label for="p">비밀번호</label>
+      <input id="p" name="password" type="password" autocomplete="current-password" />
+      ${notice}
+      <button type="submit">로그인</button>
+    </form>
+  </div>
 </body></html>`
 }
