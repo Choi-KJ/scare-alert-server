@@ -14,6 +14,7 @@ import {
   usernameExists,
   verifyAdmin,
 } from '../services/adminService'
+import { getContentList } from '../services/contentService'
 
 // 관리자 라우트. 세션 쿠키 기반 로그인.
 // /admin/login, /admin/logout 은 공개, 그 외 /admin/* 은 인증 필요.
@@ -86,6 +87,30 @@ adminRoute.get('/', (c) =>
     ),
   ),
 )
+
+// --- 콘텐츠 목록 (읽기) ---
+adminRoute.get('/contents', async (c) => {
+  const rows = await getContentList()
+  const fmt = (d: Date | null) =>
+    d ? new Date(d).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—'
+  const body = rows.length
+    ? `<table>
+         <thead><tr><th>콘텐츠</th><th>제보</th><th>세션</th><th>확정</th><th>최근 제보</th></tr></thead>
+         <tbody>${rows
+           .map(
+             (r) => `<tr>
+             <td><a class="link" href="/admin/contents/${r.id}">${esc(r.platform)} / ${esc(r.contentId)}</a></td>
+             <td>${r.submissionCount}</td>
+             <td>${r.sessionCount}</td>
+             <td>${r.confirmedCount}</td>
+             <td class="muted">${fmt(r.lastSubmissionAt)}</td>
+           </tr>`,
+           )
+           .join('')}</tbody>
+       </table>`
+    : `<p class="muted">아직 제보된 콘텐츠가 없습니다.</p>`
+  return c.html(shell('contents', '콘텐츠', body))
+})
 
 // --- 관리자 관리 (목록/추가/삭제) ---
 adminRoute.get('/admins', async (c) => {
@@ -227,7 +252,7 @@ function esc(s: string): string {
 function shell(active: string, title: string, body: string): string {
   const items = [
     { key: 'dashboard', label: '대시보드', href: '/admin', ic: '▦' },
-    { key: 'contents', label: '콘텐츠', href: '#', ic: '🎬' },
+    { key: 'contents', label: '콘텐츠', href: '/admin/contents', ic: '🎬' },
     { key: 'review', label: '제보 검수', href: '#', ic: '🔎' },
     { key: 'admins', label: '관리자 관리', href: '/admin/admins', ic: '⚙' },
   ]
