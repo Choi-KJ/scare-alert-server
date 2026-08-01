@@ -14,7 +14,8 @@ import {
   usernameExists,
   verifyAdmin,
 } from '../services/adminService'
-import { getContentList } from '../services/contentService'
+import { getContentDetail, getContentList } from '../services/contentService'
+import { MIN_SESSIONS } from '../lib/aggregate'
 
 // 관리자 라우트. 세션 쿠키 기반 로그인.
 // /admin/login, /admin/logout 은 공개, 그 외 /admin/* 은 인증 필요.
@@ -110,6 +111,79 @@ adminRoute.get('/contents', async (c) => {
        </table>`
     : `<p class="muted">아직 제보된 콘텐츠가 없습니다.</p>`
   return c.html(shell('contents', '콘텐츠', body))
+})
+
+// --- 콘텐츠 상세 (읽기): 확정 타임스탬프 + 제보 클러스터 ---
+adminRoute.get('/contents/:id', async (c) => {
+  const id = Number(c.req.param('id'))
+  const d = await getContentDetail(id)
+  if (!d) {
+    return c.html(
+      shell('contents', '콘텐츠', '<p class="muted">콘텐츠를 찾을 수 없습니다. <a class="link" href="/admin/contents">← 목록으로</a></p>'),
+      404,
+    )
+  }
+
+  const mmss = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+  const timeCell = (s: number) => `<td class="time">${mmss(s)}<span class="sec">${s}s</span></td>`
+
+  const confirmedRows =
+    d.confirmed.length === 0
+      ? `<tr><td colspan="4" class="muted">아직 확정된 지점이 없습니다.</td></tr>`
+      : d.confirmed
+          .map(
+            (t) => `<tr>
+              ${timeCell(t.atSeconds)}
+              <td>${t.source === 'manual' ? '—' : t.confidence.toFixed(2)}</td>
+              <td>${t.source === 'manual' ? '—' : t.reportCount}</td>
+              <td><span class="badge badge-${t.source}">${t.source === 'manual' ? '수동' : '집계'}</span></td>
+            </tr>`,
+          )
+          .join('')
+
+  const clusterRows =
+    d.clusters.length === 0
+      ? `<tr><td colspan="4" class="muted">제보가 없습니다.</td></tr>`
+      : d.clusters
+          .map(
+            (cl) => `<tr>
+              ${timeCell(cl.atSeconds)}
+              <td>${cl.reportCount}</td>
+              <td>${cl.sessionCount}</td>
+              <td>${
+                cl.confirmed
+                  ? '<span class="badge badge-ok">확정</span>'
+                  : `<span class="badge badge-pending">미달 (세션 ${cl.sessionCount}/${MIN_SESSIONS})</span>`
+              }</td>
+            </tr>`,
+          )
+          .join('')
+
+  const body = `
+    <div class="crumb"><a class="link" href="/admin/contents">← 콘텐츠</a></div>
+    <div class="stats">
+      <span>원시 제보 <b>${d.submissionCount}</b></span>
+      <span>서로 다른 세션 <b>${d.sessionCount}</b></span>
+      <span>확정 <b>${d.confirmed.length}</b>곳</span>
+      <span>${d.movieId ? '영화 연결됨' : '영화 미연결'}</span>
+    </div>
+
+    <h2>확정 타임스탬프 <span class="link">${d.confirmed.length}</span></h2>
+    <p class="muted" style="font-size:12.5px">알림(오버레이)에 반영되는 지점. 집계/수동 구분.</p>
+    <table>
+      <thead><tr><th>시각</th><th>신뢰도</th><th>제보수</th><th>출처</th></tr></thead>
+      <tbody>${confirmedRows}</tbody>
+    </table>
+
+    <h2>제보 클러스터 <span class="link">${d.clusters.length}</span></h2>
+    <p class="muted" style="font-size:12.5px">±2초로 묶은 제보 그룹. 서로 다른 세션 ${MIN_SESSIONS}개 이상이면 자동 확정.</p>
+    <table>
+      <thead><tr><th>대표 시각</th><th>제보수</th><th>세션수</th><th>상태</th></tr></thead>
+      <tbody>${clusterRows}</tbody>
+    </table>`
+
+  return c.html(shell('contents', `${esc(d.platform)} / ${esc(d.contentId)}`, body))
 })
 
 // --- 관리자 관리 (목록/추가/삭제) ---

@@ -31,6 +31,16 @@ form.add input{font:inherit;font-size:13px;color:var(--ink);background:var(--pan
 .ok{color:#7fd6a2}
 .fail{color:#e88}
 .user-link{color:var(--marquee);font-weight:600;cursor:pointer;border-bottom:1px dotted rgba(242,183,5,.4)}
+.badge{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:100px;display:inline-block}
+.badge-aggregated{background:rgba(242,183,5,0.14);color:var(--marquee)}
+.badge-manual{background:rgba(63,174,107,0.16);color:#7fd6a2}
+.badge-ok{background:rgba(63,174,107,0.16);color:#7fd6a2}
+.badge-pending{background:rgba(139,137,150,0.18);color:var(--muted)}
+.time{font-variant-numeric:tabular-nums;font-weight:600}
+.time .sec{color:var(--muted);font-weight:400;font-size:12px;margin-left:6px}
+.stats{display:flex;gap:20px;color:var(--muted);font-size:13px;margin:2px 0 20px}
+.stats b{color:var(--ink)}
+.crumb{margin-bottom:6px}
 
 /* ---------- 사이드바 쉘 ---------- */
 .app{display:flex;min-height:100vh}

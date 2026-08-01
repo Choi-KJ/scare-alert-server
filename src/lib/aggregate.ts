@@ -25,7 +25,16 @@ export interface AggregateOptions {
 }
 
 // 초기값: N=2초 / M=2. M은 우연·조작 방지를 위해 운영하며 3+로 올리는 걸 권장.
-const DEFAULTS: Required<AggregateOptions> = { windowSeconds: 2, minSessions: 2 }
+export const DEFAULTS: Required<AggregateOptions> = { windowSeconds: 2, minSessions: 2 }
+/** 확정에 필요한 서로 다른 세션 수 (관리자 화면 표시에도 사용) */
+export const MIN_SESSIONS = DEFAULTS.minSessions
+
+/** 클러스터(묶음) 요약 — 확정 여부와 무관하게 모든 묶음을 표현 */
+export interface Cluster {
+  atSeconds: number // 대표 시각(중앙값)
+  reportCount: number // 묶음 내 총 제보 수
+  sessionCount: number // 서로 다른 세션 수
+}
 
 function median(nums: number[]): number {
   const s = [...nums].sort((a, b) => a - b)
@@ -34,38 +43,40 @@ function median(nums: number[]): number {
 }
 
 /**
- * 순수 함수: 원시 제보 목록 → 확정 지점 목록. DB에 의존하지 않아 단위 테스트가 쉽다.
+ * 순수 함수: 원시 제보를 시점 근접도(±windowSeconds)로 묶어 모든 클러스터를 반환.
+ * (확정 임계값 필터 없음 — 관리자 검수 화면에서 미달 묶음도 보여주기 위함)
+ */
+export function buildClusters(reports: RawReport[], windowSeconds = DEFAULTS.windowSeconds): Cluster[] {
+  if (reports.length === 0) return []
+  const sorted = [...reports].sort((a, b) => a.atSeconds - b.atSeconds)
+
+  const groups: RawReport[][] = [[sorted[0]]]
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = sorted[i].atSeconds - sorted[i - 1].atSeconds
+    if (gap <= windowSeconds) groups[groups.length - 1].push(sorted[i])
+    else groups.push([sorted[i]])
+  }
+
+  return groups.map((g) => ({
+    atSeconds: Number(median(g.map((r) => r.atSeconds)).toFixed(2)),
+    reportCount: g.length,
+    sessionCount: new Set(g.map((r) => r.sessionId)).size,
+  }))
+}
+
+/**
+ * 순수 함수: 원시 제보 목록 → 확정 지점 목록 (서로 다른 세션 M개 이상인 클러스터만).
  */
 export function aggregateReports(reports: RawReport[], options: AggregateOptions = {}): ConfirmedPoint[] {
   const { windowSeconds, minSessions } = { ...DEFAULTS, ...options }
-  if (reports.length === 0) return []
-
-  const sorted = [...reports].sort((a, b) => a.atSeconds - b.atSeconds)
-
-  // ① 클러스터링: 정렬 후 연속 간격이 windowSeconds를 넘으면 새 묶음 시작
-  const clusters: RawReport[][] = [[sorted[0]]]
-  for (let i = 1; i < sorted.length; i++) {
-    const gap = sorted[i].atSeconds - sorted[i - 1].atSeconds
-    if (gap <= windowSeconds) {
-      clusters[clusters.length - 1].push(sorted[i])
-    } else {
-      clusters.push([sorted[i]])
-    }
-  }
-
-  // ② 서로 다른 세션 M개 이상인 묶음만 확정, ③ 중앙값을 대표 시각으로
-  const confirmed: ConfirmedPoint[] = []
-  for (const cluster of clusters) {
-    const sessions = new Set(cluster.map((r) => r.sessionId))
-    if (sessions.size < minSessions) continue // 미달 → 확정 안 함(대기)
-    confirmed.push({
-      atSeconds: Number(median(cluster.map((r) => r.atSeconds)).toFixed(2)),
-      reportCount: cluster.length,
-      sessionCount: sessions.size,
-      confidence: Math.min(1, sessions.size / (minSessions + 1)),
-    })
-  }
-  return confirmed
+  return buildClusters(reports, windowSeconds)
+    .filter((c) => c.sessionCount >= minSessions)
+    .map((c) => ({
+      atSeconds: c.atSeconds,
+      reportCount: c.reportCount,
+      sessionCount: c.sessionCount,
+      confidence: Math.min(1, c.sessionCount / (minSessions + 1)),
+    }))
 }
 
 /**
