@@ -27,24 +27,33 @@
 ## 구조 (레이어드 — Spring의 Controller→Service→Repository와 매핑)
 ```
 src/
-  index.ts        # 앱 진입점: 미들웨어 + API 라우트 + 정적(public) 서빙
-  config.ts       # 환경변수 (application.yml 자리)
+  index.ts        # 앱 진입점: 미들웨어 + API 라우트 + /admin + 정적(public) 서빙 + 첫 관리자 시딩
+  config.ts       # 환경변수 (DB, ADMIN_USER/PASSWORD, SESSION_SECRET)
   db/
-    schema.ts     # Drizzle 스키마 (@Entity 자리): movies / platform_contents / submissions / confirmed_timestamps
-    client.ts     # 커넥션 풀 + db 인스턴스 (DataSource 자리)
-  routes/         # HTTP 라우트 (@RestController 자리) — 검증 후 service 호출만
+    schema.ts     # Drizzle 스키마: movies / platform_contents / submissions / confirmed_timestamps
+                  #                 / admins / admin_login_attempts
+    client.ts     # 커넥션 풀(UTC 세션) + db 인스턴스
+  routes/
     submissions.ts   # POST /api/submissions
     timestamps.ts    # GET  /api/timestamps
-  services/       # 비즈니스 로직 (@Service 자리)
+    admin.ts         # /admin/* : 세션 로그인, 관리자 관리, 콘텐츠 목록/상세, 수동 등록/삭제 (Hono HTML 렌더)
+  services/
     submissionService.ts   # 제보 저장 → 어뷰징 검사 → 재집계
+    adminService.ts        # 관리자 계정(bcrypt) + 로그인 감사 로그 조회
+    contentService.ts      # 콘텐츠 목록/상세 집계 + 수동 타임스탬프 add/delete
   lib/
-    aggregate.ts    # 집계/확정: ±N초 클러스터링 + 서로 다른 세션 M개 → 중앙값 확정 (N=2, M=2)
-    rateLimit.ts    # 어뷰징 방지: 세션 빈도 제한(5초, DB NOW 기준) + 중복 제거
-public/           # 정적 사이트 (index.html=랜딩, styles.css, *.svg)
-drizzle/          # drizzle-kit이 생성한 마이그레이션 SQL (커밋함)
+    aggregate.ts    # buildClusters(모든 묶음) + aggregateReports(확정) + recomputeConfirmed. 대표 강도(최빈) 포함
+    rateLimit.ts    # 제보 어뷰징 방지: 세션 빈도 제한 + 중복 제거
+    loginRateLimit.ts # 관리자 로그인 무차별 대입 방지(IP 5회/15분)
+public/           # 정적: index.html=랜딩, admin.css(관리자 공용), *.svg
+drizzle/          # 마이그레이션 SQL (0000~0004)
 ```
-**구현 완료(2026-07-31):** 제보 API·집계/확정·어뷰징 방지 실DB 검증 완료. 확장과 실환경 연동됨(제보 수신 + 확정 조회).
-아직 없는 것(예정): 영화 목록/상세·관리자 페이지, 집계 M 상향(3+), 단위 테스트.
+**구현 완료(2026-08-02):**
+- 제보 API·집계/확정·어뷰징 방지 실DB 검증, 확장과 실환경 연동(제보 수신 + 확정 조회 카운트다운).
+- **관리자**: 세션 로그인 + DB `admins`(다중, bcrypt) + 첫 관리자 시딩 + 무차별 대입 방지 + 로그인 감사 로그.
+- **관리자 페이지**: 사이드바 쉘 + 대시보드(내용 추후) / 콘텐츠 목록·상세(확정·클러스터) / 수동 타임스탬프 등록·삭제 / 확정 강도(최빈) 표시.
+
+**아직 없는 것(예정):** 클러스터 확정 승격·반려, 영화(canonical) 연결, 대시보드 내용, 집계 M 상향(3+), 단위 테스트, 배포(HTTPS + 쿠키 secure).
 
 ## 명령어
 - `npm run dev` — 개발 서버(파일 변경 시 자동 재시작, http://localhost:3000)
