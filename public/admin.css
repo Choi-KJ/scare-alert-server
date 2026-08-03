@@ -23,7 +23,7 @@ td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
 .btn[disabled]{opacity:.4;cursor:not-allowed}
 .btn-sm{padding:4px 10px;font-size:12px}
 form.add{display:flex;gap:10px;flex-wrap:wrap}
-form.add input{font:inherit;font-size:13px;color:var(--ink);background:var(--panel-2);
+form.add input,form.add select{font:inherit;font-size:13px;color:var(--ink);background:var(--panel-2);
   border:1px solid var(--line-strong);border-radius:7px;padding:8px 11px}
 .notice{border-radius:8px;padding:9px 12px;font-size:13px;margin:14px 0;
   background:rgba(242,183,5,0.12);color:var(--marquee);border:1px solid rgba(242,183,5,0.3)}

@@ -14,8 +14,13 @@ import {
   usernameExists,
   verifyAdmin,
 } from '../services/adminService'
-import { getContentDetail, getContentList } from '../services/contentService'
-import { MIN_SESSIONS } from '../lib/aggregate'
+import {
+  addManualTimestamp,
+  deleteManualTimestamp,
+  getContentDetail,
+  getContentList,
+} from '../services/contentService'
+import { type Intensity, MIN_SESSIONS } from '../lib/aggregate'
 
 // 관리자 라우트. 세션 쿠키 기반 로그인.
 // /admin/login, /admin/logout 은 공개, 그 외 /admin/* 은 인증 필요.
@@ -127,17 +132,25 @@ adminRoute.get('/contents/:id', async (c) => {
   const mmss = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`
   const timeCell = (s: number) => `<td class="time">${mmss(s)}<span class="sec">${s}s</span></td>`
+  const msg = c.req.query('msg')
+  const notice = msg ? `<div class="notice">${esc(decodeURIComponent(msg))}</div>` : ''
 
   const confirmedRows =
     d.confirmed.length === 0
-      ? `<tr><td colspan="4" class="muted">아직 확정된 지점이 없습니다.</td></tr>`
+      ? `<tr><td colspan="6" class="muted">아직 확정된 지점이 없습니다.</td></tr>`
       : d.confirmed
           .map(
             (t) => `<tr>
               ${timeCell(t.atSeconds)}
+              <td>${intensityLabel(t.intensity)}</td>
               <td>${t.source === 'manual' ? '—' : t.confidence.toFixed(2)}</td>
               <td>${t.source === 'manual' ? '—' : t.reportCount}</td>
               <td><span class="badge badge-${t.source}">${t.source === 'manual' ? '수동' : '집계'}</span></td>
+              <td style="text-align:right">${
+                t.source === 'manual'
+                  ? `<form method="post" action="/admin/contents/${d.id}/confirmed/${t.id}/delete" onsubmit="return confirm('삭제할까요?')"><button class="btn btn-sm btn-danger">삭제</button></form>`
+                  : '<span class="muted" style="font-size:12px">자동 관리</span>'
+              }</td>
             </tr>`,
           )
           .join('')
@@ -162,6 +175,7 @@ adminRoute.get('/contents/:id', async (c) => {
 
   const body = `
     <div class="crumb"><a class="link" href="/admin/contents">← 콘텐츠</a></div>
+    ${notice}
     <div class="stats">
       <span>원시 제보 <b>${d.submissionCount}</b></span>
       <span>서로 다른 세션 <b>${d.sessionCount}</b></span>
@@ -172,9 +186,21 @@ adminRoute.get('/contents/:id', async (c) => {
     <h2>확정 타임스탬프 <span class="link">${d.confirmed.length}</span></h2>
     <p class="muted" style="font-size:12.5px">알림(오버레이)에 반영되는 지점. 집계/수동 구분.</p>
     <table>
-      <thead><tr><th>시각</th><th>신뢰도</th><th>제보수</th><th>출처</th></tr></thead>
+      <thead><tr><th>시각</th><th>강도</th><th>신뢰도</th><th>제보수</th><th>출처</th><th></th></tr></thead>
       <tbody>${confirmedRows}</tbody>
     </table>
+
+    <h2>수동 타임스탬프 등록</h2>
+    <p class="muted" style="font-size:12.5px">콜드스타트 시딩용. 등록하면 '수동' 확정으로 즉시 알림에 반영되고 재집계에도 보존됩니다.</p>
+    <form method="post" action="/admin/contents/${d.id}/manual" class="add">
+      <input name="time" placeholder="시각 (예: 02:03 또는 123.4)" required />
+      <select name="intensity">
+        <option value="moderate">보통</option>
+        <option value="mild">약함</option>
+        <option value="intense">강함</option>
+      </select>
+      <button class="btn btn-primary">등록</button>
+    </form>
 
     <h2>제보 클러스터 <span class="link">${d.clusters.length}</span></h2>
     <p class="muted" style="font-size:12.5px">±2초로 묶은 제보 그룹. 서로 다른 세션 ${MIN_SESSIONS}개 이상이면 자동 확정.</p>
@@ -184,6 +210,31 @@ adminRoute.get('/contents/:id', async (c) => {
     </table>`
 
   return c.html(shell('contents', `${esc(d.platform)} / ${esc(d.contentId)}`, body))
+})
+
+// 수동 타임스탬프 등록
+adminRoute.post('/contents/:id/manual', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.parseBody()
+  const at = parseTime(String(body.time ?? ''))
+  const intensity = String(body.intensity ?? 'moderate') as Intensity
+  const back = `/admin/contents/${id}`
+  if (at === null || at < 0) {
+    return c.redirect(`${back}?msg=` + encodeURIComponent('시각 형식이 올바르지 않습니다. (예: 02:03 또는 123.4)'))
+  }
+  if (!['mild', 'moderate', 'intense'].includes(intensity)) {
+    return c.redirect(`${back}?msg=` + encodeURIComponent('강도 값이 올바르지 않습니다.'))
+  }
+  await addManualTimestamp(id, Number(at.toFixed(2)), intensity)
+  return c.redirect(`${back}?msg=` + encodeURIComponent(`수동 확정 등록됨 · ${at.toFixed(1)}초`))
+})
+
+// 수동 확정 삭제
+adminRoute.post('/contents/:id/confirmed/:cid/delete', async (c) => {
+  const id = Number(c.req.param('id'))
+  const cid = Number(c.req.param('cid'))
+  await deleteManualTimestamp(cid)
+  return c.redirect(`/admin/contents/${id}?msg=` + encodeURIComponent('수동 확정 삭제됨'))
 })
 
 // --- 관리자 관리 (목록/추가/삭제) ---
@@ -313,6 +364,20 @@ function clientIp(c: Context): string {
   const xff = c.req.header('x-forwarded-for')
   const raw = xff ? (xff.split(',')[0] ?? '').trim() : (getConnInfo(c).remote.address ?? 'unknown')
   return raw.replace(/^::ffff:/, '') // IPv4-mapped IPv6(::ffff:1.2.3.4) → 1.2.3.4
+}
+
+// 강도 표시 라벨
+function intensityLabel(i: Intensity): string {
+  return i === 'mild' ? '약함' : i === 'intense' ? '강함' : '보통'
+}
+
+// "mm:ss"(예 02:03) 또는 "초"(예 123.4)를 초로 파싱. 실패 시 null.
+function parseTime(s: string): number | null {
+  const v = s.trim()
+  if (/^\d+(\.\d+)?$/.test(v)) return Number(v)
+  const m = v.match(/^(\d+):([0-5]?\d(?:\.\d+)?)$/)
+  if (m) return Number(m[1]) * 60 + Number(m[2])
+  return null
 }
 
 // HTML 이스케이프 (사용자 입력 표시 시 XSS 방지)

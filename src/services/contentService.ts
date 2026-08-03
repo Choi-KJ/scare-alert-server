@@ -1,6 +1,6 @@
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from '../db/client'
-import { buildClusters, MIN_SESSIONS } from '../lib/aggregate'
+import { buildClusters, type Intensity, MIN_SESSIONS } from '../lib/aggregate'
 import { confirmedTimestamps, platformContents, submissions } from '../db/schema'
 
 // 관리자 콘텐츠 목록/집계 조회 (읽기 전용).
@@ -58,7 +58,9 @@ export async function getContentList(): Promise<ContentRow[]> {
 }
 
 export interface ConfirmedRow {
+  id: number
   atSeconds: number
+  intensity: Intensity
   confidence: number
   reportCount: number
   source: 'aggregated' | 'manual'
@@ -67,6 +69,7 @@ export interface ConfirmedRow {
 
 export interface ClusterRow {
   atSeconds: number
+  intensity: Intensity
   reportCount: number
   sessionCount: number
   confirmed: boolean
@@ -90,13 +93,19 @@ export async function getContentDetail(pcId: number): Promise<ContentDetail | nu
   const pc = pcRows[0]
 
   const subs = await db
-    .select({ atSeconds: submissions.atSeconds, sessionId: submissions.sessionId })
+    .select({
+      atSeconds: submissions.atSeconds,
+      sessionId: submissions.sessionId,
+      intensity: submissions.intensity,
+    })
     .from(submissions)
     .where(eq(submissions.platformContentId, pcId))
 
   const confirmed = await db
     .select({
+      id: confirmedTimestamps.id,
       atSeconds: confirmedTimestamps.atSeconds,
+      intensity: confirmedTimestamps.intensity,
       confidence: confirmedTimestamps.confidence,
       reportCount: confirmedTimestamps.reportCount,
       source: confirmedTimestamps.source,
@@ -121,4 +130,28 @@ export async function getContentDetail(pcId: number): Promise<ContentDetail | nu
     confirmed,
     clusters,
   }
+}
+
+/** 관리자 수동 확정 타임스탬프 추가 (source='manual'). 재집계에도 보존된다. */
+export async function addManualTimestamp(
+  platformContentId: number,
+  atSeconds: number,
+  intensity: Intensity,
+): Promise<void> {
+  await db.insert(confirmedTimestamps).values({
+    platformContentId,
+    atSeconds,
+    intensity,
+    confidence: 1, // 관리자 등록 = 신뢰. 표시에선 '수동'으로 구분
+    reportCount: 0,
+    status: 'confirmed',
+    source: 'manual',
+  })
+}
+
+/** 수동 확정만 삭제 (집계 결과는 재집계로 관리되므로 건드리지 않음). */
+export async function deleteManualTimestamp(confirmedId: number): Promise<void> {
+  await db
+    .delete(confirmedTimestamps)
+    .where(and(eq(confirmedTimestamps.id, confirmedId), eq(confirmedTimestamps.source, 'manual')))
 }

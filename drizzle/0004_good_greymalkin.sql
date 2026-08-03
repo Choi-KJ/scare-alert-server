@@ -1,0 +1,1 @@
+ALTER TABLE `confirmed_timestamps` ADD `intensity` enum('mild','moderate','intense') DEFAULT 'moderate' NOT NULL;

@@ -5,13 +5,17 @@ import { confirmedTimestamps, submissions } from '../db/schema'
 // 집계/확정 엔진 (프로젝트의 핵심).
 // 흐름: ① 가까운 제보끼리 묶기(±N초) → ② 서로 다른 세션 M개 이상인 묶음만 확정 → ③ 중앙값을 대표 시각으로.
 
+export type Intensity = 'mild' | 'moderate' | 'intense'
+
 export interface RawReport {
   atSeconds: number
   sessionId: string
+  intensity: Intensity
 }
 
 export interface ConfirmedPoint {
   atSeconds: number // 대표 시각 (클러스터 중앙값)
+  intensity: Intensity // 대표 강도 (최빈값, 동률이면 더 센 쪽)
   reportCount: number // 클러스터 내 총 제보 수
   sessionCount: number // 서로 다른 세션 수
   confidence: number // 신뢰도 0..1 (현재는 세션 수 기반 — 추후 정교화)
@@ -32,6 +36,7 @@ export const MIN_SESSIONS = DEFAULTS.minSessions
 /** 클러스터(묶음) 요약 — 확정 여부와 무관하게 모든 묶음을 표현 */
 export interface Cluster {
   atSeconds: number // 대표 시각(중앙값)
+  intensity: Intensity // 대표 강도(최빈값)
   reportCount: number // 묶음 내 총 제보 수
   sessionCount: number // 서로 다른 세션 수
 }
@@ -40,6 +45,23 @@ function median(nums: number[]): number {
   const s = [...nums].sort((a, b) => a - b)
   const mid = Math.floor(s.length / 2)
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
+}
+
+const INTENSITY_RANK: Record<Intensity, number> = { mild: 1, moderate: 2, intense: 3 }
+
+/** 대표 강도 = 최빈값. 동률이면 더 센 강도를 택한다(안전하게 강하게 경고). */
+function modeIntensity(items: Intensity[]): Intensity {
+  const count: Record<Intensity, number> = { mild: 0, moderate: 0, intense: 0 }
+  for (const i of items) count[i] += 1
+  let best: Intensity = 'moderate'
+  let bestCount = -1
+  for (const i of ['mild', 'moderate', 'intense'] as Intensity[]) {
+    if (count[i] > bestCount || (count[i] === bestCount && INTENSITY_RANK[i] > INTENSITY_RANK[best])) {
+      best = i
+      bestCount = count[i]
+    }
+  }
+  return best
 }
 
 /**
@@ -59,6 +81,7 @@ export function buildClusters(reports: RawReport[], windowSeconds = DEFAULTS.win
 
   return groups.map((g) => ({
     atSeconds: Number(median(g.map((r) => r.atSeconds)).toFixed(2)),
+    intensity: modeIntensity(g.map((r) => r.intensity)),
     reportCount: g.length,
     sessionCount: new Set(g.map((r) => r.sessionId)).size,
   }))
@@ -73,6 +96,7 @@ export function aggregateReports(reports: RawReport[], options: AggregateOptions
     .filter((c) => c.sessionCount >= minSessions)
     .map((c) => ({
       atSeconds: c.atSeconds,
+      intensity: c.intensity,
       reportCount: c.reportCount,
       sessionCount: c.sessionCount,
       confidence: Math.min(1, c.sessionCount / (minSessions + 1)),
@@ -88,7 +112,11 @@ export async function recomputeConfirmed(
   options?: AggregateOptions,
 ): Promise<ConfirmedPoint[]> {
   const rows = await db
-    .select({ atSeconds: submissions.atSeconds, sessionId: submissions.sessionId })
+    .select({
+      atSeconds: submissions.atSeconds,
+      sessionId: submissions.sessionId,
+      intensity: submissions.intensity,
+    })
     .from(submissions)
     .where(eq(submissions.platformContentId, platformContentId))
 
@@ -108,6 +136,7 @@ export async function recomputeConfirmed(
       points.map((p) => ({
         platformContentId,
         atSeconds: p.atSeconds,
+        intensity: p.intensity,
         confidence: p.confidence,
         reportCount: p.reportCount,
         status: 'confirmed',

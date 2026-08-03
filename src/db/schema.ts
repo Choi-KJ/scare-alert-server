@@ -66,6 +66,7 @@ export const confirmedTimestamps = mysqlTable('confirmed_timestamps', {
   id: int('id').primaryKey().autoincrement(),
   platformContentId: int('platform_content_id').notNull(),
   atSeconds: double('at_seconds').notNull(),
+  intensity: mysqlEnum('intensity', INTENSITY).notNull().default('moderate'), // 대표 강도(집계=최빈, 수동=입력값)
   confidence: double('confidence').notNull().default(0),
   reportCount: int('report_count').notNull().default(0),
   status: varchar('status', { length: 16 }).notNull().default('confirmed'),
